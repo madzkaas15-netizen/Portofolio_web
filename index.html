@@ -145,6 +145,28 @@ input,select{background:var(--bg);border:1px solid var(--line);border-radius:9px
 .login form{display:flex;flex-direction:column;gap:12px}
 .login p{margin:0;color:var(--fg-2)}
 .search{max-width:320px}
+.av{overflow:hidden}
+.av img{width:100%;height:100%;object-fit:cover;display:block}
+.av.big{width:84px;height:84px;font-size:34px}
+.profhead{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:16px}
+.subtabs{display:flex;gap:4px;border-bottom:1px solid var(--line);overflow-x:auto}
+.subtabs button{background:none;border:0;border-bottom:3px solid transparent;padding:9px 14px;font-weight:500;color:var(--fg-2);white-space:nowrap}
+.subtabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--accent);font-weight:600}
+.or{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:13px;margin:16px 0 4px}
+.or::before,.or::after{content:"";flex:1;height:1px;background:var(--line)}
+.gbtn{display:flex;flex-direction:column;align-items:center;gap:8px;margin-top:12px;min-height:44px}
+.gfake{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;max-width:320px;padding:10px 16px;border-radius:99px;border:1px solid var(--line);background:var(--panel);color:var(--fg);font-weight:500}
+.gfake:hover{background:var(--panel-2)}
+.guide details{border-bottom:1px solid var(--line)}
+.guide details:last-child{border-bottom:0}
+.guide summary{cursor:pointer;padding:13px 2px;font-weight:600;list-style:none;display:flex;justify-content:space-between;gap:12px;align-items:center}
+.guide summary::-webkit-details-marker{display:none}
+.guide summary::after{content:"+";font:500 20px var(--f-head);color:var(--muted);flex:none}
+.guide details[open] summary::after{content:"\2212"}
+.guide .gb{padding:0 2px 14px;color:var(--fg-2);max-width:70ch}
+.guide .gb p{margin:0 0 8px}
+.guide .gb ol,.guide .gb ul{margin:0 0 8px;padding-left:20px}
+.guide .gb li{margin-bottom:4px}
 @media (max-width:820px){
   .app{grid-template-columns:minmax(0,1fr);gap:12px;padding-bottom:84px}
   .side{position:static}
@@ -180,12 +202,14 @@ input,select{background:var(--bg);border:1px solid var(--line);border-radius:9px
 </div>
 <div class="toast" id="toast" role="status" hidden></div>
 <input type="file" id="restorefile" accept=".json,application/json" hidden>
+<input type="file" id="avatarfile" accept="image/*" hidden>
 <script>
 (function(){
 "use strict";
 var $=function(s){return document.querySelector(s)};
 var $$=function(s){return Array.prototype.slice.call(document.querySelectorAll(s))};
 function pad(n,w){return String(n).padStart(w||2,"0")}
+function okAvatar(a){return typeof a==="string"&&((a.length<150000&&/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+\/=]+$/.test(a))||/^https:\/\/[a-z0-9.-]+\.googleusercontent\.com\/[^\s"'<>]*$/.test(a))}
 function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,8)}
 function todayStr(){var d=new Date();return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())}
@@ -237,13 +261,14 @@ function evalExpr(s){s=String(s||"").replace(/×/g,"*").replace(/÷/g,"/").repla
 /* ---------- Data & penyimpanan ---------- */
 var KEY="mf2:";
 function defaultData(){return {settings:{lang:"id",main:"IDR",theme:"system",rates:Object.assign({},DEFRATES)},
-  accounts:[{id:"a1",name:"Dompet",cur:"IDR",open:0}],tx:[],transfers:[],
+  accounts:[{id:"a1",name:"Dompet",cur:"IDR",open:0}],tx:[],transfers:[],me:{name:"",avatar:""},
   profile:{salary:0,pots:[{id:"p1",name:"Kebutuhan",pct:50,c:1},{id:"p2",name:"Keinginan",pct:30,c:2},{id:"p3",name:"Tabungan",pct:20,c:3}]}}}
 function normData(d){var b=defaultData();if(!d||typeof d!=="object")return b;
   var s=d.settings||{};b.settings.lang=s.lang==="en"?"en":"id";b.settings.main=CUR[s.main]?s.main:"IDR";
   b.settings.theme=["light","dark"].indexOf(s.theme)>=0?s.theme:"system";
   if(s.rates&&typeof s.rates==="object")Object.keys(CUR).forEach(function(c){var v=Number(s.rates[c]);if(v>0)b.settings.rates[c]=v});
   b.settings.rates.IDR=1;
+  var m0=d.me&&typeof d.me==="object"?d.me:{};b.me={name:String(m0.name||"").slice(0,60),avatar:okAvatar(m0.avatar)?m0.avatar:""};
   if(Array.isArray(d.accounts)&&d.accounts.length)b.accounts=d.accounts.filter(function(a){return a&&a.id&&a.name}).map(function(a){return {id:String(a.id),name:String(a.name),cur:CUR[a.cur]?a.cur:"IDR",open:Number(a.open)||0}});
   if(!b.accounts.length)b.accounts=defaultData().accounts;
   var aid=b.accounts[0].id;
@@ -297,8 +322,8 @@ function renderChrome(){
   var cur=TABS.filter(function(x){return x[0]===S.tab})[0];$("#title").textContent=L(cur[1],cur[2]);
   $("#monthbar").hidden=!!NOMONTH[S.tab];$("#monthlabel").textContent=monthName(S.month);$("#thismonthbtn").textContent=L("Bulan ini","This month");
   var w=$("#who");w.textContent="";
-  var av=document.createElement("span");av.className="av";av.textContent=S.email.charAt(0).toUpperCase();
-  var sp=document.createElement("span");sp.className="em";sp.textContent=S.email;
+  var av=document.createElement("span");av.className="av";fillAv(av);
+  var sp=document.createElement("span");sp.className="em";sp.textContent=dispName()||S.email;
   var b=document.createElement("button");b.className="btn ghost small";b.dataset.act="logout";b.textContent=L("Ganti akun","Switch account");
   w.appendChild(av);w.appendChild(sp);w.appendChild(b);document.documentElement.lang=isEn()?"en":"id"}
 function render(){
@@ -586,23 +611,90 @@ function restoreInto(o){var d=normData(o.data||o),have={};S.data.tx.forEach(func
   var add=d.tx.filter(function(t){return !have[t.id]});S.data.tx=S.data.tx.concat(add);
   var ha={};S.data.accounts.forEach(function(a){ha[a.id]=1});d.accounts.forEach(function(a){if(!ha[a.id])S.data.accounts.push(a)});
   var ht={};S.data.transfers.forEach(function(t){ht[t.id]=1});d.transfers.forEach(function(t){if(!ht[t.id])S.data.transfers.push(t)});
-  S.data.profile=d.profile;assignCodes(S.data);persist();render();toast(add.length+L(" transaksi dipulihkan"," transactions restored"))}
+  S.data.profile=d.profile;if(!S.data.me.name)S.data.me.name=d.me.name;if(!S.data.me.avatar)S.data.me.avatar=d.me.avatar;assignCodes(S.data);persist();render();toast(add.length+L(" transaksi dipulihkan"," transactions restored"))}
 
-/* ---------- Pengaturan ---------- */
+/* ---------- Pengaturan: profil, tampilan, panduan ---------- */
+var GUIDE=[["Mulai: daftar dan masuk", "Getting started: sign up and sign in", "<ol><li>Pilih <b>Daftar</b>, isi email dan kata sandi (minimal 6 karakter), lalu tekan Buat akun.</li><li>Jika admin sudah mengaktifkan login Google, tekan tombol Google untuk masuk tanpa kata sandi.</li><li>Lain kali pilih <b>Masuk</b>. Untuk berganti akun, tekan <b>Ganti akun</b> di kanan atas.</li></ol><p>Jika halaman dibuka tanpa server, akun dan datamu hanya tersimpan di browser itu. Simpan cadangan secara berkala.</p>", "<ol><li>Choose <b>Sign up</b>, enter your email and a password (at least 6 characters), then press Create account.</li><li>If the admin has turned on Google sign-in, press the Google button to sign in without a password.</li><li>Next time choose <b>Sign in</b>. To change accounts, press <b>Switch account</b> at the top right.</li></ol><p>If the page is opened without a server, your account and data live only in that browser. Save a backup regularly.</p>"], ["Dasbor", "Dashboard", "<p>Dasbor merangkum satu bulan. Pakai tombol panah di atas untuk berpindah bulan, atau <b>Bulan ini</b> untuk kembali.</p><ul><li><b>Sisa</b>: pemasukan dikurangi pengeluaran bulan itu.</li><li><b>Rasio menabung</b>: bagian pemasukan yang tidak terpakai.</li><li><b>Tren 6 bulan</b>: sentuh atau arahkan kursor ke batang untuk melihat angkanya.</li><li><b>Diagram donat</b>: pengeluaran per kategori dalam persen.</li><li><b>Pantauan anggaran</b>: tiap pos gaji berstatus Aman, Hampir habis, atau Melebihi.</li></ul><p>Belum ada data? Tekan <b>Isi data contoh</b> untuk melihat contoh, lalu <b>Hapus data contoh</b> kapan saja.</p>", "<p>The dashboard summarizes one month. Use the arrows at the top to change month, or <b>This month</b> to come back.</p><ul><li><b>Net</b>: income minus expenses for that month.</li><li><b>Savings rate</b>: the share of income you did not spend.</li><li><b>6-month trend</b>: touch or hover a bar to see the numbers.</li><li><b>Donut chart</b>: expenses by category in percent.</li><li><b>Budget tracker</b>: each salary pot shows On track, Almost used, or Over.</li></ul><p>No data yet? Press <b>Load sample data</b> for a preview, then <b>Remove sample data</b> any time.</p>"], ["Mencatat transaksi dan kalkulator", "Adding transactions and the calculator", "<ol><li>Buka <b>Transaksi</b> dan pilih Pengeluaran atau Pemasukan.</li><li>Isi tanggal, jumlah, mata uang, rekening, kategori, dan keterangan.</li><li>Tekan <b>Tambah</b>.</li></ol><p>Kolom jumlah menerima hitungan, misalnya <b>45.000+12.500*2</b>. Hasilnya muncul di bawah kolom. Tombol <b>Buka kalkulator</b> menampilkan tombol angka untuk layar sentuh. Kamu bisa memakai + − × ÷ dan tanda kurung.</p>", "<ol><li>Open <b>Transactions</b> and choose Expense or Income.</li><li>Fill in the date, amount, currency, account, category and note.</li><li>Press <b>Add</b>.</li></ol><p>The amount field accepts calculations, for example <b>45,000+12,500*2</b>. The result shows under the field. <b>Open calculator</b> shows number keys for touch screens. You can use + − × ÷ and parentheses.</p>"], ["ID transaksi dan pencarian", "Transaction IDs and search", "<p>Setiap transaksi mendapat ID unik: <b>IN-</b> untuk pemasukan, <b>OUT-</b> untuk pengeluaran, <b>TF-</b> untuk transfer, diikuti tahun-bulan dan nomor urut, contohnya <b>OUT-202611-0003</b>.</p><ul><li>Ketik ID, keterangan, kategori, atau nama rekening di kolom cari pada tab Transaksi.</li><li>Saat kolom cari terisi, semua bulan ikut dicari.</li><li>Pakai filter jenis untuk hanya melihat pemasukan atau pengeluaran.</li><li>Untuk menghapus, tekan <b>Hapus</b> lalu <b>Yakin hapus?</b> sebagai konfirmasi.</li></ul>", "<p>Every transaction gets a unique ID: <b>IN-</b> for income, <b>OUT-</b> for expenses, <b>TF-</b> for transfers, followed by year-month and a running number, for example <b>OUT-202611-0003</b>.</p><ul><li>Type an ID, note, category or account name in the search box on the Transactions tab.</li><li>While the search box is filled, all months are searched.</li><li>Use the type filter to see only income or only expenses.</li><li>To delete, press <b>Delete</b> then <b>Delete?</b> to confirm.</li></ul>"], ["Bagi gaji ke beberapa pos", "Splitting your salary into pots", "<ol><li>Buka <b>Bagi Gaji</b> dan isi total gaji bulanan.</li><li>Pilih pola 50/30/20 atau Lima pos, atau atur pos sendiri.</li><li>Ubah nama dan persen tiap pos. Nominalnya dihitung otomatis. Totalnya sebaiknya 100%.</li><li>Tekan <b>Catat sebagai pemasukan bulan ini</b> untuk memasukkan gaji sebagai transaksi.</li></ol><p>Nama pos menjadi kategori pengeluaran, sehingga dasbor bisa memantau pemakaian tiap pos. Jika nama pos diganti, transaksi lama tetap memakai nama sebelumnya.</p>", "<ol><li>Open <b>Split</b> and enter your monthly salary.</li><li>Pick the 50/30/20 rule or Five pots, or set up your own pots.</li><li>Edit each pot's name and percent. The amount is calculated for you. The total should be 100%.</li><li>Press <b>Record as this month's income</b> to add the salary as a transaction.</li></ol><p>Pot names become expense categories, so the dashboard can track each pot. If you rename a pot, older transactions keep the previous name.</p>"], ["Rekening dan transfer", "Accounts and transfers", "<ul><li>Di <b>Rekening</b>, tambah rekening (mis. Bank, E-wallet, Tunai) dengan mata uang dan saldo awal.</li><li>Saldo tiap rekening mengikuti transaksi dan transfer.</li><li>Untuk transfer, pilih rekening asal dan tujuan lalu isi jumlah. Jika mata uangnya berbeda, jumlah diterima dihitung dari kurs dan bisa kamu ubah.</li><li>Rekening yang sudah dipakai transaksi atau transfer tidak bisa dihapus.</li></ul>", "<ul><li>In <b>Accounts</b>, add accounts (e.g. Bank, E-wallet, Cash) with a currency and opening balance.</li><li>Each balance follows your transactions and transfers.</li><li>For a transfer, pick the source and target account and enter the amount. If the currencies differ, the received amount is calculated from the rate and you can edit it.</li><li>An account that is used by transactions or transfers cannot be deleted.</li></ul>"], ["Mata uang dan kurs", "Currencies and exchange rates", "<p>Setiap transaksi punya mata uang sendiri (14 pilihan). Semua total, grafik, dan anggaran dihitung ke <b>mata uang utama</b>.</p><p>Atur mata uang utama dan kurs di Pengaturan, tab <b>Tampilan &amp; kurs</b>. Kurs awal hanya perkiraan dan tidak diperbarui otomatis, jadi sesuaikan dengan kurs yang kamu pakai.</p>", "<p>Each transaction has its own currency (14 to choose from). All totals, charts and budgets are calculated in your <b>main currency</b>.</p><p>Set the main currency and rates in Settings, on the <b>Display &amp; rates</b> tab. Default rates are approximate and do not update automatically, so adjust them to the rates you use.</p>"], ["Laporan dan unduhan", "Reports and downloads", "<p>Tab <b>Laporan</b> menampilkan grafik pemasukan dan pengeluaran 12 bulan, komposisi pengeluaran, dan tabel ringkasan bulanan.</p><ul><li><b>PDF</b>: ringkasan dan semua transaksi bulan yang dipilih, lengkap dengan ID.</li><li><b>Excel</b>: lima lembar (Transaksi, Transfer, Rekening, Ringkasan Bulanan, Pembagian Gaji) berisi semua bulan.</li><li><b>CSV</b>: semua transaksi, bisa dibuka di aplikasi spreadsheet apa pun.</li></ul><p>File dibuat di browsermu dan tersimpan di folder Unduhan.</p>", "<p>The <b>Reports</b> tab shows a 12-month income and expense chart, the expense mix, and a monthly summary table.</p><ul><li><b>PDF</b>: the summary and every transaction of the selected month, with IDs.</li><li><b>Excel</b>: five sheets (Transactions, Transfers, Accounts, Monthly summary, Salary split) covering all months.</li><li><b>CSV</b>: all transactions, openable in any spreadsheet app.</li></ul><p>Files are created in your browser and saved to your Downloads folder.</p>"], ["Profil dan pengaturan", "Profile and settings", "<p>Di <b>Pengaturan</b> ada tiga tab:</p><ul><li><b>Profil</b>: ganti nama dan foto, ganti kata sandi, cadangkan atau pulihkan data, dan keluar.</li><li><b>Tampilan &amp; kurs</b>: bahasa Indonesia atau Inggris, mata uang utama, mode terang, gelap, atau ikut perangkat, dan kurs.</li><li><b>Buku panduan</b>: halaman ini.</li></ul><p>Foto dikecilkan otomatis. Email tidak bisa diganti karena dipakai untuk masuk.</p>", "<p><b>Settings</b> has three tabs:</p><ul><li><b>Profile</b>: change your name and photo, change your password, back up or restore data, and sign out.</li><li><b>Display &amp; rates</b>: Indonesian or English, main currency, light, dark or follow-device mode, and rates.</li><li><b>User guide</b>: this page.</li></ul><p>Photos are resized automatically. Your email cannot be changed because it is used to sign in.</p>"], ["Cadangan dan pindah data", "Backups and moving your data", "<p>Cadangan adalah file JSON berisi semua datamu.</p><ul><li>Tekan <b>Cadangkan data</b> untuk mengunduhnya.</li><li>Tekan <b>Pulihkan dari cadangan</b> dan pilih file itu untuk menggabungkannya. Transaksi yang sudah ada tidak digandakan.</li></ul><p>Jika aplikasi dipakai tanpa server, cadangan adalah satu-satunya cara memindahkan data ke perangkat lain. Simpan salinannya secara berkala.</p>", "<p>A backup is a JSON file holding all your data.</p><ul><li>Press <b>Back up data</b> to download it.</li><li>Press <b>Restore from backup</b> and choose that file to merge it in. Existing transactions are not duplicated.</li></ul><p>If the app is used without a server, a backup is the only way to move data to another device. Keep a copy regularly.</p>"], ["Masalah umum", "Common problems", "<ul><li><b>Lupa kata sandi:</b> minta admin server menjalankan perintah resetpw. Jika kamu masuk dengan Google, tidak perlu kata sandi.</li><li><b>Data hilang saat dipakai tanpa server:</b> biasanya karena data browser dibersihkan. Pulihkan dari file cadangan.</li><li><b>Unduhan tidak muncul:</b> periksa apakah browser memblokir unduhan, lalu coba lagi.</li><li><b>Tampilan tidak berubah setelah pembaruan:</b> muat ulang paksa dengan Ctrl+Shift+R.</li></ul>", "<ul><li><b>Forgot your password:</b> ask the server admin to run the resetpw command. If you sign in with Google, you do not need a password.</li><li><b>Data missing when used without a server:</b> usually the browser data was cleared. Restore from a backup file.</li><li><b>Download does not appear:</b> check whether the browser blocked it, then try again.</li><li><b>Page looks unchanged after an update:</b> force reload with Ctrl+Shift+R.</li></ul>"]];
 function rateVal(c){var r=S.data.settings.rates;return r[c]/r[S.data.settings.main]}
 function fmtRate(v){return Number(v.toPrecision(6)).toLocaleString(loc(),{maximumFractionDigits:8})}
-function renderSettings(){var st=S.data.settings,mc=st.main;
+function dispName(){var m=S.data&&S.data.me;return (m&&m.name)||""}
+function fillAv(el){el.textContent="";var m=S.data&&S.data.me;
+  if(m&&okAvatar(m.avatar)){var im=document.createElement("img");im.alt="";im.src=m.avatar;el.appendChild(im)}
+  else el.textContent=(dispName()||S.email||"?").charAt(0).toUpperCase()}
+function pickAvatar(file){if(!file)return;
+  if(!/^image\//.test(file.type)){toast(L("Pilih file gambar.","Choose an image file."));return}
+  if(file.size>15*1024*1024){toast(L("Gambar terlalu besar (maks 15 MB).","Image too large (max 15 MB)."));return}
+  var fr=new FileReader();
+  fr.onload=function(){var im=new Image();
+    im.onload=function(){var n=192,c=document.createElement("canvas");c.width=c.height=n;var x=c.getContext("2d"),s=Math.min(im.width,im.height);
+      x.fillStyle="#fff";x.fillRect(0,0,n,n);x.drawImage(im,(im.width-s)/2,(im.height-s)/2,s,s,0,0,n,n);
+      S.data.me.avatar=c.toDataURL("image/jpeg",.85);persist();renderChrome();renderSettings();toast(L("Foto profil diperbarui","Profile photo updated"))};
+    im.onerror=function(){toast(L("Gambar tidak bisa dibaca.","Cannot read that image."))};im.src=fr.result};
+  fr.readAsDataURL(file)}
+function submitPw(e){e.preventDefault();var err=$("#pw-err");err.textContent="";
+  var o=$("#pw-old")?$("#pw-old").value:"",n=$("#pw-new").value,n2=$("#pw-new2").value;
+  if(n.length<6){err.textContent=L("Kata sandi baru minimal 6 karakter.","New password needs at least 6 characters.");return}
+  if(n!==n2){err.textContent=L("Pengulangan kata sandi tidak sama.","The two new passwords do not match.");return}
+  api("POST","/api/password",{old:o,new:n}).then(function(r){
+    if(!r.ok){err.textContent=(r.json&&r.json.error)||L("Gagal mengganti kata sandi.","Could not change the password.");return}
+    S.auth=S.auth||{};S.auth.hasPw=true;toast(L("Kata sandi disimpan","Password saved"));renderSettings()},
+   function(){err.textContent=L("Server tidak terjangkau.","Cannot reach the server.")})}
+function profilHtml(au){var me=S.data.me;
+  return '<section class="panel"><h3>'+L("Edit profil","Edit profile")+'</h3><div class="profhead"><span class="av big" id="avbig"></span><div class="row"><button class="btn ghost small" type="button" data-act="pickavatar">'+L("Ganti foto","Change photo")+'</button>'+(me.avatar?'<button class="btn ghost small" type="button" data-act="rmavatar">'+L("Hapus foto","Remove photo")+'</button>':'')+'</div></div>'+
+   '<div class="form"><label class="f">'+L("Nama","Name")+'<input type="text" id="p-name" maxlength="60" autocomplete="name" value="'+esc(me.name)+'" placeholder="'+L("Nama yang tampil di aplikasi","Name shown in the app")+'"></label><label class="f">Email<input type="text" value="'+esc(S.email)+'" disabled></label></div>'+
+   '<p class="hint">'+(au.google?L("Akun ini terhubung dengan Google. ","This account is linked to Google. "):L("Email dipakai untuk masuk dan tidak bisa diganti di sini. ","Your email is used to sign in and cannot be changed here. "))+L("Foto dikecilkan otomatis dan disimpan bersama datamu.","Photos are resized automatically and saved with your data.")+'</p></section>'+
+   '<section class="panel"><h3>'+(au.hasPw?L("Ganti kata sandi","Change password"):L("Buat kata sandi","Create a password"))+'</h3>'+
+   (au.hasPw?'':'<p style="margin:0 0 12px;color:var(--fg-2)">'+L("Akunmu masuk lewat Google. Buat kata sandi agar kamu juga bisa masuk dengan email.","You sign in with Google. Create a password so you can also sign in with email.")+'</p>')+
+   '<form class="form" id="pwform" autocomplete="off">'+(au.hasPw?'<label class="f">'+L("Kata sandi lama","Current password")+'<input type="password" id="pw-old" autocomplete="current-password" required></label>':'')+
+   '<label class="f">'+L("Kata sandi baru","New password")+'<input type="password" id="pw-new" autocomplete="new-password" minlength="6" required></label><label class="f">'+L("Ulangi kata sandi baru","Repeat new password")+'<input type="password" id="pw-new2" autocomplete="new-password" minlength="6" required></label>'+
+   '<div class="full row"><button class="btn" type="submit">'+L("Simpan kata sandi","Save password")+'</button><span class="err" id="pw-err" role="alert"></span></div></form>'+(LOCAL?'':'<p class="hint">'+L("Setelah diganti, perangkat lain keluar otomatis.","After changing it, your other devices are signed out.")+'</p>')+'</section>'+
+   '<section class="panel"><h3>'+L("Data dan akun","Data and account")+'</h3><div class="row"><button class="btn ghost" data-act="backup">'+L("Cadangkan data","Back up data")+'</button><button class="btn ghost" data-act="restore">'+L("Pulihkan dari cadangan","Restore from backup")+'</button><button class="btn ghost" data-act="logout">'+L("Ganti akun","Switch account")+'</button></div><p class="hint">'+
+   (LOCAL?L("Data tersimpan di browser ini, terpisah untuk tiap akun. Unduh cadangan JSON secara berkala dan pulihkan di perangkat lain.","Data is stored in this browser, separate for each account. Download a JSON backup regularly and restore it on another device."):L("Data tersimpan di database server dan ikut ke perangkat mana pun saat kamu masuk. Cadangan JSON berguna sebagai salinan pribadi.","Data lives in the server database and follows you to any device you sign in on. A JSON backup is handy as a personal copy."))+'</p></section>'}
+function displayHtml(st,mc){
   var rr=Object.keys(CUR).map(function(c){return '<tr><td><b>'+c+'</b> <span class="sub">'+esc(CUR[c][0])+'</span></td><td class="num">1 '+c+' =</td><td style="width:150px">'+(c===mc?'<input type="text" value="1" disabled aria-label="'+c+'">':'<input type="text" inputmode="decimal" data-rate="'+c+'" value="'+fmtRate(rateVal(c))+'" aria-label="'+L("Kurs ","Rate ")+c+'">')+'</td><td>'+mc+'</td></tr>'}).join("");
-  $("#view").innerHTML='<section class="panel"><h3>'+L("Tampilan dan bahasa","Display and language")+'</h3><div class="form">'+
+  return '<section class="panel"><h3>'+L("Tampilan dan bahasa","Display and language")+'</h3><div class="form">'+
    '<label class="f">'+L("Bahasa","Language")+'<select id="s-lang"><option value="id"'+(st.lang==="id"?" selected":"")+'>Bahasa Indonesia</option><option value="en"'+(st.lang==="en"?" selected":"")+'>English</option></select></label>'+
    '<label class="f">'+L("Mata uang utama","Main currency")+'<select id="s-main">'+curOptions(mc)+'</select></label>'+
    '<label class="f">'+L("Mode tampilan","Theme")+'<select id="s-theme"><option value="system"'+(st.theme==="system"?" selected":"")+'>'+L("Ikuti perangkat","Follow device")+'</option><option value="light"'+(st.theme==="light"?" selected":"")+'>'+L("Terang","Light")+'</option><option value="dark"'+(st.theme==="dark"?" selected":"")+'>'+L("Gelap","Dark")+'</option></select></label></div>'+
    '<p class="hint">'+L("Semua total, grafik, dan anggaran ditampilkan dalam mata uang utama. Tiap transaksi tetap disimpan dalam mata uang aslinya.","All totals, charts and budgets are shown in your main currency. Each transaction keeps its original currency.")+'</p></section>'+
-   '<section class="panel"><h3>'+L("Kurs mata uang","Exchange rates")+'</h3><div class="scroll"><table><tbody>'+rr+'</tbody></table></div><div class="row" style="margin-top:12px"><button class="btn ghost small" data-act="resetrates">'+L("Kembalikan kurs awal","Reset to default rates")+'</button></div><p class="hint">'+L("Kurs awal hanya perkiraan dan tidak diperbarui otomatis. Ubah angkanya sesuai kurs yang kamu pakai, perubahan langsung diterapkan ke semua total.","Default rates are approximate and do not update automatically. Edit them to the rates you use; changes apply to all totals immediately.")+'</p></section>'+
-   '<section class="panel"><h3>'+L("Akun","Account")+'</h3><p style="margin:0 0 10px;color:var(--fg-2)">'+esc(S.email)+'</p><div class="row"><button class="btn ghost" data-act="backup">'+L("Cadangkan data","Back up data")+'</button><button class="btn ghost" data-act="restore">'+L("Pulihkan dari cadangan","Restore from backup")+'</button><button class="btn ghost" data-act="logout">'+L("Ganti akun","Switch account")+'</button></div><p class="hint">'+(LOCAL?L("Data tersimpan di browser ini, terpisah untuk tiap akun. Unduh cadangan JSON secara berkala dan pulihkan di perangkat lain.","Data is stored in this browser, separate for each account. Download a JSON backup regularly and restore it on another device."):L("Data tersimpan di database server dan ikut ke perangkat mana pun saat kamu masuk. Cadangan JSON berguna sebagai salinan pribadi.","Data lives in the server database and follows you to any device you sign in on. A JSON backup is handy as a personal copy."))+'</p></section>'}
+   '<section class="panel"><h3>'+L("Kurs mata uang","Exchange rates")+'</h3><div class="scroll"><table><tbody>'+rr+'</tbody></table></div><div class="row" style="margin-top:12px"><button class="btn ghost small" data-act="resetrates">'+L("Kembalikan kurs awal","Reset to default rates")+'</button></div><p class="hint">'+L("Kurs awal hanya perkiraan dan tidak diperbarui otomatis. Ubah angkanya sesuai kurs yang kamu pakai, perubahan langsung diterapkan ke semua total.","Default rates are approximate and do not update automatically. Edit them to the rates you use; changes apply to all totals immediately.")+'</p></section>'}
+function guideHtml(){
+  return '<section class="panel"><h3>'+L("Buku panduan","User guide")+'</h3><p class="hint" style="margin:-4px 0 6px">'+L("Ketuk judul untuk membuka penjelasannya.","Tap a title to open its explanation.")+'</p><div class="guide">'+
+   GUIDE.map(function(g,i){return '<details'+(i===0?' open':'')+'><summary>'+esc(L(g[0],g[1]))+'</summary><div class="gb">'+L(g[2],g[3])+'</div></details>'}).join("")+'</div></section>'}
+function renderSettings(){var st=S.data.settings,mc=st.main,tab=S.stab||"profil",au=S.auth||{hasPw:true,google:false};
+  var tabs=[["profil","Profil","Profile"],["tampilan","Tampilan & kurs","Display & rates"],["panduan","Buku panduan","User guide"]];
+  var h='<div class="subtabs" role="tablist">'+tabs.map(function(x){return '<button type="button" role="tab" data-stab="'+x[0]+'" aria-selected="'+(tab===x[0])+'">'+esc(L(x[1],x[2]))+'</button>'}).join("")+'</div>';
+  h+=tab==="profil"?profilHtml(au):tab==="tampilan"?displayHtml(st,mc):guideHtml();
+  $("#view").innerHTML=h;var av=$("#avbig");if(av)fillAv(av)}
+
+/* ---------- Masuk dengan Google ---------- */
+var GLOGO='<svg viewBox="0 0 48 48" width="18" height="18" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>';
+function gmsg(){var web=/^https?:$/.test(location.protocol);
+  if(!LOCAL)return L("Login Google belum diaktifkan di server ini. Admin perlu mengisi GOOGLE_CLIENT_ID (lihat README).","Google sign-in is not turned on for this server. The admin needs to set GOOGLE_CLIENT_ID (see README).");
+  if(!S.gid)return L("Login Google belum diaktifkan. Isi GOOGLE_CLIENT_ID di bagian atas skrip halaman ini, lalu buka lewat alamat https (lihat README).","Google sign-in is not turned on. Set GOOGLE_CLIENT_ID at the top of this page's script and open it over https (see README).");
+  if(!web)return L("Google hanya bisa dipakai jika halaman dibuka lewat alamat https, bukan dari file atau WhatsApp. Unggah halaman ini ke hosting atau jalankan server.py.","Google only works when the page is opened over https, not from a file or WhatsApp. Upload this page to a host or run server.py.");
+  return ""}
+function renderGoogle(){var box=$("#gbtn");if(!box)return;
+  var m=gmsg();
+  if(m){box.innerHTML='<button type="button" class="gfake" data-act="googleinfo">'+GLOGO+'<span>'+L("Masuk dengan Google","Continue with Google")+'</span></button><p class="hint" id="g-note" role="status" style="margin:0;text-align:center" hidden></p>';return}
+  if(window.google&&google.accounts&&google.accounts.id){
+    if(S.ginit!==S.gid){google.accounts.id.initialize({client_id:S.gid,callback:onGoogle,auto_select:false});S.ginit=S.gid}
+    box.textContent="";google.accounts.id.renderButton(box,{theme:"outline",size:"large",shape:"pill",text:S.lmode==="up"?"signup_with":"signin_with",width:Math.min(320,box.clientWidth||320),locale:isEn()?"en":"id"});return}
+  if(S.gsi)return;S.gsi=1;
+  var s=document.createElement("script");s.src="https://accounts.google.com/gsi/client";s.async=true;
+  s.onload=function(){renderGoogle()};
+  s.onerror=function(){S.gsi=0;var b=$("#gbtn");if(b)b.innerHTML='<p class="hint" style="margin:0">'+L("Tidak bisa memuat Google. Periksa koneksi internet.","Could not load Google. Check your internet connection.")+'</p>'};
+  document.head.appendChild(s)}
+function onGoogle(resp){var err=$("#l-err");
+  api("POST","/api/google",{credential:resp&&resp.credential}).then(function(r){
+    if(!r.ok){if(err)err.textContent=(r.json&&r.json.error)||L("Gagal masuk dengan Google.","Google sign-in failed.");return}
+    startSession(r.json.email,r.json)},
+   function(){if(err)err.textContent=L("Server tidak terjangkau.","Cannot reach the server.")})}
 
 /* ---------- Masuk (server) ---------- */
 var LOCAL=false;
+/* Tanpa server.py: isi Client ID dari Google Cloud di sini agar tombol Google aktif (halaman harus dibuka lewat https). Dengan server.py, isi lewat variabel GOOGLE_CLIENT_ID di server. */
+var GOOGLE_CLIENT_ID="";
 function api(method,url,body){
   if(LOCAL)return localApi(method,url,body);
   return fetch(url,{method:method,credentials:"same-origin",headers:body?{"Content-Type":"application/json"}:{},body:body?JSON.stringify(body):undefined,keepalive:method==="PUT"&&body&&JSON.stringify(body).length<60000})
@@ -614,13 +706,16 @@ function showLogin(mode){S.email="";S.data=null;S.rev=0;if(mode)S.lmode=mode;S.l
    '<p style="margin-bottom:12px">'+(reg?L("Buat akun untuk menyimpan catatan keuanganmu di server ini.","Create an account to keep your finances on this server."):L("Masuk untuk membuka catatanmu dari perangkat mana pun.","Sign in to open your records from any device."))+'</p>'+
    '<form id="loginform"><label class="f">Email<input type="email" id="l-email" autocomplete="email" required value="'+esc(S.lemail||"")+'" placeholder="nama@email.com"></label><label class="f">'+L("Kata sandi","Password")+'<input type="password" id="l-pass" autocomplete="'+(reg?"new-password":"current-password")+'" required minlength="6"></label>'+
    '<div class="row"><button class="btn" type="submit">'+(reg?L("Buat akun","Create account"):L("Masuk","Sign in"))+'</button><span class="err" id="l-err" role="alert"></span></div></form>'+
-   '<div class="row" style="margin-top:14px"><button class="btn ghost small" type="button" data-act="prelang">'+(S.pre==="en"?"Bahasa Indonesia":"English")+'</button></div>'+
-   '<p class="hint">'+(LOCAL?L("Mode lokal: akun dan data hanya tersimpan di browser ini. Gunakan cadangan JSON untuk memindahkan data.","Local mode: accounts and data live only in this browser. Use a JSON backup to move your data."):L("Lupa kata sandi? Admin server bisa menggantinya dengan perintah resetpw.","Forgot your password? The server admin can reset it with the resetpw command."))+'</p></section></div>'}
-function startSession(email){S.email=email;S.openDel=null;S.q="";
-  return api("GET","/api/data").then(function(r){
+   '<div class="or"><span>'+L("atau","or")+'</span></div><div id="gbtn" class="gbtn"></div>'+'<div class="row" style="margin-top:14px"><button class="btn ghost small" type="button" data-act="prelang">'+(S.pre==="en"?"Bahasa Indonesia":"English")+'</button></div>'+
+   '<p class="hint">'+(LOCAL?L("Mode lokal: akun dan data hanya tersimpan di browser ini. Gunakan cadangan JSON untuk memindahkan data.","Local mode: accounts and data live only in this browser. Use a JSON backup to move your data."):L("Lupa kata sandi? Admin server bisa menggantinya dengan perintah resetpw.","Forgot your password? The server admin can reset it with the resetpw command."))+'</p></section></div>';renderGoogle()}
+function startSession(email,extra){S.email=email;S.openDel=null;S.q="";S.stab="profil";
+  return Promise.all([api("GET","/api/me"),api("GET","/api/data")]).then(function(a){var me=a[0],r=a[1];
     if(!r.ok){showLogin("in");return}
-    S.rev=r.json.rev||0;S.data=r.json.data?normData(r.json.data):defaultData2();
-    $("#login").hidden=true;$("#app").hidden=false;readHash();render();if(!r.json.data)persist()})}
+    S.auth={hasPw:me.ok?me.json.hasPw!==false:true,google:!!(me.ok&&me.json.google)};
+    S.rev=r.json.rev||0;S.data=r.json.data?normData(r.json.data):defaultData2();var ch=false;
+    if(extra&&extra.name&&!S.data.me.name){S.data.me.name=String(extra.name).slice(0,60);ch=true}
+    if(extra&&extra.picture&&!S.data.me.avatar&&okAvatar(extra.picture)){S.data.me.avatar=extra.picture;ch=true}
+    $("#login").hidden=true;$("#app").hidden=false;readHash();render();if(!r.json.data||ch)persist()})}
 function logout(){clearTimeout(saveT);persist();var n=0;(function w(){if((saving||dirty)&&n++<30)return setTimeout(w,100);api("POST","/api/logout",{}).then(function(){S.lmode="in";showLogin()})})()}
 function submitLogin(e){e.preventDefault();var email=$("#l-email").value.trim().toLowerCase(),pass=$("#l-pass").value,err=$("#l-err");err.textContent="";S.lemail=email;
   if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){err.textContent=L("Masukkan email yang valid.","Enter a valid email.");return}
@@ -651,11 +746,19 @@ var mem={};
 function lget(k){try{return localStorage.getItem(k)}catch(e){return mem[k]==null?null:mem[k]}}
 function lset(k,v){try{localStorage.setItem(k,v)}catch(e){mem[k]=v}}
 function ldel(k){try{localStorage.removeItem(k)}catch(e){delete mem[k]}}
+function jwtClaims(t){try{var p=String(t).split(".")[1].replace(/-/g,"+").replace(/_/g,"/");while(p.length%4)p+="=";var b=atob(p),u=new Uint8Array(b.length);for(var i=0;i<b.length;i++)u[i]=b.charCodeAt(i);return JSON.parse(new TextDecoder().decode(u))}catch(e){return null}}
 function localApi(method,url,body){
   var users={};try{users=JSON.parse(lget("mf3:users")||"{}")||{}}catch(e){}
   function res(st,j){return Promise.resolve({ok:st<300,status:st,json:j})}
   var me=lget("mf3:session");if(me&&!users[me])me=null;
-  if(url==="/api/me")return me?res(200,{email:me}):res(401,{error:"belum masuk"});
+  if(url==="/api/me")return me?res(200,{email:me,hasPw:!users[me].nopw,google:!!users[me].g}):res(401,{error:"belum masuk"});
+  if(url==="/api/google"){var gc=jwtClaims(body.credential);
+    if(!S.gid||!gc||gc.aud!==S.gid||["accounts.google.com","https://accounts.google.com"].indexOf(gc.iss)<0||!(Number(gc.exp)>Date.now()/1000)||String(gc.email_verified)!=="true"||!gc.email)return res(401,{error:"token Google tidak valid"});
+    var ge=String(gc.email).toLowerCase();if(!users[ge])users[ge]={h:"",s:"",nopw:true};users[ge].g=1;lset("mf3:users",JSON.stringify(users));lset("mf3:session",ge);
+    var gp=String(gc.picture||"");if(!/^https:\/\/[a-z0-9.-]+\.googleusercontent\.com\//.test(gp))gp="";
+    return res(200,{email:ge,name:String(gc.name||"").slice(0,60),picture:gp})}
+  if(url==="/api/password"){if(!me)return res(401,{error:"belum masuk"});var u2=users[me],old=String(body.old||""),nw=String(body.new||"");if(nw.length<6)return res(400,{error:"kata sandi baru minimal 6 karakter"});
+    return (u2.nopw?Promise.resolve(u2.h):sha(u2.s+old)).then(function(h1){if(h1!==u2.h)return {ok:false,status:401,json:{error:"kata sandi lama salah"}};var s2=uid();return sha(s2+nw).then(function(h2){users[me]={h:h2,s:s2,g:u2.g};lset("mf3:users",JSON.stringify(users));return {ok:true,status:200,json:{ok:true}}})})}
   if(url==="/api/logout"){ldel("mf3:session");return res(200,{ok:true})}
   if(url==="/api/register"||url==="/api/login"){var email=String(body.email||"").trim().toLowerCase(),pw=String(body.password||"");
     if(url==="/api/register"){
@@ -676,6 +779,7 @@ function localApi(method,url,body){
 document.addEventListener("click",function(e){var t=e.target.closest("button");if(!t)return;
   if(t.dataset.mode){S.lmode=t.dataset.mode;S.lemail=($("#l-email")||{}).value||S.lemail;showLogin();return}
   if(t.dataset.tab){setTab(t.dataset.tab);return}
+  if(t.dataset.stab){S.stab=t.dataset.stab;renderSettings();return}
   if(t.dataset.key){keyPress(t.dataset.key);return}
   if(t.dataset.type&&t.closest("#txform")){S.type=t.dataset.type;$$("#txform .seg button").forEach(function(b){b.setAttribute("aria-pressed",String(b.dataset.type===S.type))});fillCats();return}
   if(t.dataset.del){var id=t.dataset.del;if(S.openDel===id){S.openDel=null;S.data.tx=S.data.tx.filter(function(x){return x.id!==id});persist();renderTxTable();toast(L("Transaksi dihapus","Transaction deleted"))}else{S.openDel=id;renderTxTable()}return}
@@ -696,10 +800,14 @@ document.addEventListener("click",function(e){var t=e.target.closest("button");i
     case "restore":S.restoreMode="merge";$("#restorefile").click();break;
     case "prelang":S.pre=S.pre==="en"?"id":"en";S.lemail=($("#l-email")||{}).value||S.lemail;showLogin();break;
     case "logout":logout();break;case "logsalary":logSalary();break;
+    case "googleinfo":var gn=$("#g-note");if(gn){gn.textContent=gmsg();gn.hidden=false}break;
+    case "pickavatar":$("#avatarfile").click();break;
+    case "rmavatar":S.data.me.avatar="";persist();renderChrome();renderSettings();break;
     case "resetrates":S.data.settings.rates=Object.assign({},DEFRATES);persist();renderSettings();toast(L("Kurs dikembalikan","Rates reset"));break;
     case "addpot":if(S.data.profile.pots.length>=8){toast(L("Maksimal 8 pos","Maximum 8 pots"));break}S.data.profile.pots.push({id:"p"+uid(),name:L("Pos baru","New pot"),pct:0,c:newPotColor()});queueSave();renderSplit();break}
 });
 document.addEventListener("input",function(e){var t=e.target;
+  if(t.id==="p-name"){S.data.me.name=t.value.slice(0,60);queueSave();renderChrome();var avb=$("#avbig");if(avb)fillAv(avb);return}
   if(t.id==="f-amount"){updCalcRes();return}
   if(t.id==="q"){S.q=t.value;renderTxTable();return}
   if(t.id==="t-amt"||t.id==="t-amt2"){updTfRes();return}
@@ -709,6 +817,7 @@ document.addEventListener("input",function(e){var t=e.target;
   if(t.classList.contains("nm"))p.name=t.value;else if(t.classList.contains("pc"))p.pct=Math.max(0,Math.min(100,Number(t.value)||0));
   queueSave();renderAlloc()});
 document.addEventListener("change",function(e){var t=e.target;
+  if(t.id==="avatarfile"){var af=t.files[0];t.value="";pickAvatar(af);return}
   if(t.id==="f-cur"){updCalcRes();return}
   if(t.id==="ftype"){S.fType=t.value;renderTxTable();return}
   if(t.id==="t-from"||t.id==="t-to"){updTfRes();return}
@@ -718,7 +827,7 @@ document.addEventListener("change",function(e){var t=e.target;
   if(t.dataset&&t.dataset.rate){var c=t.dataset.rate,v=numIn(t.value);if(!(v>0)){toast(L("Kurs tidak valid","Invalid rate"));renderSettings();return}
     S.data.settings.rates[c]=v*S.data.settings.rates[S.data.settings.main];persist();t.value=fmtRate(v);toast(L("Kurs diperbarui","Rate updated"))}});
 document.addEventListener("submit",function(e){var id=e.target.id;
-  if(id==="txform")submitTx(e);else if(id==="accform")submitAcc(e);else if(id==="tfform")submitTf(e);else if(id==="loginform")submitLogin(e)});
+  if(id==="pwform")submitPw(e);else if(id==="txform")submitTx(e);else if(id==="accform")submitAcc(e);else if(id==="tfform")submitTf(e);else if(id==="loginform")submitLogin(e)});
 window.addEventListener("hashchange",function(){if(S.email){readHash();render()}});
 window.addEventListener("pagehide",function(){clearTimeout(saveT);persist()});
 $("#restorefile").addEventListener("change",function(e){var f=e.target.files[0];e.target.value="";
@@ -728,7 +837,8 @@ $("#restorefile").addEventListener("change",function(e){var f=e.target.files[0];
 /* ---------- Mulai ---------- */
 S.pre=(navigator.language||"id").toLowerCase().indexOf("id")===0?"id":"en";
 function boot(r){if(r.ok)startSession(r.json.email);else showLogin("in")}
-fetch("/api/me",{credentials:"same-origin"}).then(function(r){if(!/json/.test(r.headers.get("content-type")||""))throw 0;return r.json().then(function(j){boot({ok:r.ok,json:j})})}).catch(function(){LOCAL=true;localApi("GET","/api/me").then(boot)});
+fetch("/api/me",{credentials:"same-origin"}).then(function(r){if(!/json/.test(r.headers.get("content-type")||""))throw 0;return r.json().then(function(j){
+  return fetch("/api/config",{credentials:"same-origin"}).then(function(c){return c.json()}).then(function(c){S.gid=String(c.google||"")},function(){}).then(function(){boot({ok:r.ok,json:j})})})}).catch(function(){LOCAL=true;S.gid=GOOGLE_CLIENT_ID;localApi("GET","/api/me").then(boot)});
 window.addEventListener("online",function(){if(dirty)persist()});
 document.addEventListener("visibilitychange",function(){if(document.visibilityState==="visible"){if(dirty)persist();else syncFromServer()}});
 })();
